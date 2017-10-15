@@ -1,4 +1,4 @@
-from urllib2 import urlopen
+import urllib2
 import re
 from yahoo_finance import Share
 import datetime
@@ -87,11 +87,12 @@ class StockData(object):
     
 class FDACatalysts(object):
     def __init__(self):
-        # the webpage we want doesn't allow scraping, so we need to manually go
-        # to the page, view the source, and then copy it to a file.  
-        with open(r"C:\py_scripts\Scraper\biopharmcatalyst.html", "r") as f:
-            r = f.read()
-
+        url = "https://www.biopharmcatalyst.com/calendars/fda-calendar"
+        
+        headers = { 'User-Agent' : 'Mozilla/5.0' }
+        req = urllib2.Request(url, None, headers)
+        r = urllib2.urlopen(req).read()
+        
         # make soup
         self.soup = BeautifulSoup(r)
         
@@ -131,7 +132,7 @@ class FDACatalysts(object):
                 price = float(div.get_text().split("$")[1])
             
             for strong in stock.find_all('strong', class_='drug'):
-                drug = strong.get_text().encode("ascii", "ignore")
+                drug = strong.get_text().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
             
             for div in stock.find_all('div', class_='indication'):
                 indication = div.get_text().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
@@ -169,7 +170,7 @@ class AnalystData(object):
         self.url = "https://finance.yahoo.com/quote/%s/analysts?p=%s"%(ticker, ticker)
         
         # get the webpage text
-        self.html = urlopen(self.url).read()
+        self.html = urllib2.urlopen(self.url).read()
         
         self.parse_html()
         
@@ -257,7 +258,9 @@ if __name__ == '__main__':
     stock_list = FDACatalysts().stock_list
     
     # open our output file and add a header
-    csv_file = open(r"C:\py_scripts\Scraper\data.csv", "w")
+    now = datetime.datetime.utcnow()
+    filename = "c:\\py_scripts\\Scraper\\%s_StockData.csv"%now.strftime("%Y%m%d_%H%M%S")
+    csv_file = open(filename, "w")
     csv_file.write(StockData.HEADER)
     
     count = 0
