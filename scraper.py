@@ -126,26 +126,26 @@ class FDACatalysts(object):
             count += 1
             
             for a in stock.find_all('a', class_="ticker"):
-                ticker =  a.get_text().encode("ascii", "ingore")
+                ticker =  a.get_text().strip().encode("ascii", "ingore")
             
             for div in stock.find_all('div', class_="price"):
                 price = float(div.get_text().split("$")[1])
             
             for strong in stock.find_all('strong', class_='drug'):
-                drug = strong.get_text().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
+                drug = strong.get_text().strip().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
             
             for div in stock.find_all('div', class_='indication'):
-                indication = div.get_text().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
+                indication = div.get_text().strip().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
             
             for td in stock.find_all('td', class_="stage"):
-                phase = td.get_text().encode("ascii", "ignore").strip()
+                phase = td.get_text().strip().encode("ascii", "ignore")
             
             for time in stock.find_all('time', class_="catalyst-date"):
-                d = time.get_text()
+                d = time.get_text().strip()
                 date = datetime.datetime.strptime(d, "%m/%d/%Y").date()
             
             for div in stock.find_all('div', class_="catalyst-note"):
-                catalyst = div.get_text().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
+                catalyst = div.get_text().strip().replace(",", " ").replace("\n"," ").encode("ascii", "ignore")
             
             print "Ticker = %s"%ticker
             print "Price = %.2f"%price
