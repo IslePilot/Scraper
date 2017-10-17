@@ -85,6 +85,7 @@ class StockData(object):
         string += "\n"
         return string
     
+    
 class FDACatalysts(object):
     def __init__(self):
         url = "https://www.biopharmcatalyst.com/calendars/fda-calendar"
@@ -206,7 +207,7 @@ class AnalystData(object):
         #print "Reccomendation Count: %d"%self.rec_count
         
         # "targetLowPrice":{"raw":37,"fmt":"37.00"}
-        l = self.get_string("targetlowPrice").split('"')
+        l = self.get_string("targetLowPrice").split('"')
         if len(l) > 5:
             self.target_low = float(l[5])
         #print "Target Low Price: %.2f"%self.target_low
@@ -249,8 +250,7 @@ class AnalystData(object):
         return self.html[open_brace:close_brace+1]
     
     def get_data(self):
-        return self.recommendation_mean, self.strong_buy, self.buy, self.current_price, \
-            self.target_low, self.target_mean, self.target_high, self.target_growth
+        return self.recommendation_mean, self.strong_buy, self.buy, self.current_price, self.target_low, self.target_mean, self.target_high, self.target_growth
 
 
 if __name__ == '__main__':
