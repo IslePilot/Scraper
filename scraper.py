@@ -3,7 +3,7 @@ import re
 from yahoo_finance import Share
 import datetime
 from bs4 import BeautifulSoup
-from networkx.algorithms.flow.capacityscaling import capacity_scaling
+from collections import namedtuple
 
 
 class StockData(object):
@@ -263,17 +263,56 @@ if __name__ == '__main__':
     csv_file = open(filename, "w")
     csv_file.write(StockData.HEADER)
     
+    # define the limits
+    price_min = 2.00
+    date_end = datetime.datetime(year=2018, month=2, day=28).date()
+    rec_max = 2.0
+    count_min = 4
+    growth_min = 50.0
+    market_cap_max = 1500.0
+    
+    SDTuple = namedtuple("SDTuple", "ticker price drug indication phase date catalyst rec_mean sbuy buy count tlow tmean thigh tgrowth cap short")
+    outname = "C:\\py_scripts\\Scraper\\%s_TargetStocks.csv"%now.strftime("%Y%m%d_%H%M%S")
+    outfile = open(outname, "w")
+    outfile.write("Price Min($),%.2f\n"%price_min)
+    outfile.write("End Date,%s\n"%date_end.strftime("%Y-%m-%d"))
+    outfile.write("Max Mean Recommendation,%.1f\n"%rec_max)
+    outfile.write("Minimum Recommendation Count,%d\n"%count_min)
+    outfile.write("Minimum Growth(%%),%.1f\n"%growth_min)
+    outfile.write("Maximum Market Cap($M),%.1f\n"%market_cap_max)
+    outfile.write("\n")
+    outfile.write(StockData.HEADER)
+    outfile.write("\n")
+    
     count = 0
     for stock in stock_list:
         count += 1
-        if count >= 0:
-            print "%d: %s"%(count, stock.ticker)
-            stock.add_stock_data()
-            adata = AnalystData(stock.ticker)
-            stock.add_analyst_data(*adata.get_data())
-            print stock.get_csv()
-            csv_file.write(stock.get_csv())
 
+        print "%d: %s"%(count, stock.ticker)
+        stock.add_stock_data()
+        adata = AnalystData(stock.ticker)
+        stock.add_analyst_data(*adata.get_data())
+        line = stock.get_csv()
+        print line
+        csv_file.write(line)
+        
+        # do we want this line?
+        sd = SDTuple(*line.strip().split(","))
+        if sd.ticker != "Ticker" and \
+           price_min <= float(sd.price) and \
+           rec_max >= float(sd.rec_mean) and \
+           count_min <= int(sd.count) and \
+           growth_min <= float(sd.tgrowth) and \
+           market_cap_max >= float(sd.cap) and \
+           date_end >= datetime.datetime.strptime(sd.date, "%Y-%m-%d").date():
+            # put this in our file
+            string  = ",".join(map(str, sd))
+            string += "\n"
+            print string
+            outfile.write(string)
+    
+    outfile.close()
+    csv_file.close()
     
 
 
