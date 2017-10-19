@@ -1,13 +1,12 @@
 import urllib2
 import re
-from yahoo_finance import Share
 import datetime
 from bs4 import BeautifulSoup
 from collections import namedtuple
 
 
 class StockData(object):
-    HEADER = "Ticker,Price ($),Drug,Indication,Phase,Date(YMD),Catalyst,Mean Recommendation,Strong Buy,Buy,Recommendation Count,Target Min($),Target Mean($),Target High($),Growth(%),Market Cap(M),Short Ratio(Months)\n"
+    HEADER = "Ticker,Price ($),Drug,Indication,Phase,Date(YMD),Catalyst,Mean Recommendation,Strong Buy,Buy,Recommendation Count,Target Min($),Target Mean($),Target High($),Growth(%),Market Cap($),Short Percent of Float(%)\n"
     
     def __init__(self, ticker, price, drug, indication, phase, date, catalyst):
         self.ticker = ticker
@@ -17,42 +16,10 @@ class StockData(object):
         self.phase = phase
         self.date = date
         self.catalyst = catalyst
-        
-        return
-    
-    def add_stock_data(self):
-        while True:
-            try:
-                stock = Share(self.ticker)
-                break
-            except:
-                print "Error reading Yahoo: %s...retrying <<<<<<<<<<<<<<<<<<<<<<<<<<"%self.ticker
-                pass
-        
-        cap = stock.get_market_cap()
-        if cap != None:
-            if re.search("M", cap) != None:
-                self.market_cap = float(cap.strip("M"))
-            elif re.search("B", cap) != None:
-                self.market_cap = float(cap.strip("B"))*1000.0
-            else:
-                self.market_cap = float(cap)/1000000.0
-        else:
-            self.market_cap = 0.0
-        
-        sr = stock.get_short_ratio()
-        if sr != None:
-            self.short_ratio = float(sr)
-        else:
-            self.short_ratio = 0.0
-        
-        print "Market Cap: %.3f"%self.market_cap
-        print "Short ratio: %.2f"%self.short_ratio
-        
         return
     
     def add_analyst_data(self, recommendation_mean, strong_buy, buy, current_price, \
-            target_low, target_mean, target_high, target_growth):
+            target_low, target_mean, target_high, target_growth, short_percent, market_cap):
         self.recommendation_mean = recommendation_mean
         self.strong_buy = strong_buy
         self.buy = buy
@@ -62,6 +29,8 @@ class StockData(object):
         self.target_mean = target_mean
         self.target_high = target_high
         self.target_growth = target_growth
+        self.short_percent = short_percent
+        self.market_cap = market_cap
         return
     
     def get_csv(self):
@@ -81,7 +50,7 @@ class StockData(object):
         string += "%.2f,"%self.target_high
         string += "%.1f,"%self.target_growth
         string += "%.3f,"%self.market_cap
-        string += "%.2f"%self.short_ratio
+        string += "%.2f"%self.short_percent
         string += "\n"
         return string
     
@@ -169,9 +138,11 @@ class AnalystData(object):
         
         # build the link
         self.url = "https://finance.yahoo.com/quote/%s/analysts?p=%s"%(ticker, ticker)
+        self.url2 = "https://finance.yahoo.com/quote/%s/key-statistics?p=%s"%(ticker,ticker)
         
         # get the webpage text
         self.html = urllib2.urlopen(self.url).read()
+        self.html2 = urllib2.urlopen(self.url2).read()
         
         self.parse_html()
         
@@ -187,6 +158,8 @@ class AnalystData(object):
         self.target_high = 0.0
         self.current_price = 0.0
         self.target_growth = 0.0
+        self.short_percent = 0.0
+        self.market_cap = 0.0
         
         # find the average recommendation
         # {"recommendationMean":{"raw":1.7,"fmt":"1.70"}}
@@ -232,25 +205,40 @@ class AnalystData(object):
         #print "Target Growth %.1f%%"%self.target_growth
         #print "Current Price: %.2f"%self.current_price
         
+        # "shortPercentOfFloat":{"raw":0.244,"fmt":"24.40%"}
+        l = self.get_string("shortPercentOfFloat", 2).split('"')
+        if len(l) > 5:
+            self.short_percent = float(l[2].strip(":,"))*100.0
+        
+        # "marketCap":{"raw":331165120,"fmt":"331.17M"}
+        l = self.get_string("marketCap", 2).split('"')
+        if len(l) > 2:
+            self.market_cap = float(l[2].strip(":,"))
+        
+        
         print "%s: Growth:%.1f MeanRecommendation:%.1f AnalystCount:%d"%(self.ticker,
                                                                          self.target_growth,
                                                                          self.recommendation_mean,
                                                                          self.rec_count)
         return
     
-    def get_string(self, key):
+    def get_string(self, key, urltext=1):
+        if urltext == 1:
+            html = self.html
+        else:
+            html = self.html2
         # the format is always "key":{string}
         # examples:
         # "targetLowPrice":{"raw":37,"fmt":"37.00"}
         # "targetLowPrice":{}
         # find the location of the key
-        key_start = self.html.find(key)
-        open_brace = self.html.find("{", key_start)
-        close_brace = self.html.find("}", open_brace)
-        return self.html[open_brace:close_brace+1]
+        key_start = html.find(key)
+        open_brace = html.find("{", key_start)
+        close_brace = html.find("}", open_brace)
+        return html[open_brace:close_brace+1]
     
     def get_data(self):
-        return self.recommendation_mean, self.strong_buy, self.buy, self.current_price, self.target_low, self.target_mean, self.target_high, self.target_growth
+        return self.recommendation_mean, self.strong_buy, self.buy, self.current_price, self.target_low, self.target_mean, self.target_high, self.target_growth, self.short_percent, self.market_cap
 
 
 if __name__ == '__main__':
@@ -269,7 +257,7 @@ if __name__ == '__main__':
     rec_max = 2.0
     count_min = 4
     growth_min = 50.0
-    market_cap_max = 1500.0
+    market_cap_max = 1500.0e6
     
     SDTuple = namedtuple("SDTuple", "ticker price drug indication phase date catalyst rec_mean sbuy buy count tlow tmean thigh tgrowth cap short")
     outname = "C:\\py_scripts\\Scraper\\%s_TargetStocks.csv"%now.strftime("%Y%m%d_%H%M%S")
@@ -289,7 +277,6 @@ if __name__ == '__main__':
         count += 1
 
         print "%d: %s"%(count, stock.ticker)
-        stock.add_stock_data()
         adata = AnalystData(stock.ticker)
         stock.add_analyst_data(*adata.get_data())
         line = stock.get_csv()
